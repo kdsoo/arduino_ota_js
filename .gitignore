@@ -1,0 +1,16 @@
+node_modules/
+/config.json
+config.js
+package-lock.json
+.DS_Store
+.project
+.settings/
+*.sw*
+Session.vim
+default.json
+.vscode/
+.env
+git_version.h
+credential.h
+release/
+build/

@@ -1,0 +1,123 @@
+#!/usr/bin/env node
+var request = require('request');
+var fs = require('fs');
+var path = require('path');
+var ProgressBar = require('progress');
+var mdns = require('mdns');
+mdns.Browser.defaultResolverSequence[1] = 'DNSServiceGetAddrInfo' in mdns.dns_sd ? mdns.rst.DNSServiceGetAddrInfo() : mdns.rst.getaddrinfo({families:[4]});
+var commandLineArgs = require('command-line-args')
+var optionDefinitions = [
+	{name: 'verbose', alias: 'v', type: Boolean},
+	{name: 'scan', alias: 's', type: Boolean},
+	{name: 'address', alias: 'a', type: String, multiple: true},
+	{name: 'firmware', alias: 'i', type: String}
+];
+var options = commandLineArgs(optionDefinitions)
+var serviceScan = false;
+
+if (!Object.keys(options).length) {
+	console.error("No argument given");
+	show_options();
+	process.exit();
+}
+
+if (options.scan) {
+	// mdns scan
+	serviceScan = true;
+} else {
+	if (!options.address) {
+		console.error("Adress is not given");
+		show_options();
+		process.exit();
+	}
+	if(!options.firmware) {
+		console.error("firmware is not given");
+		show_options();
+		process.exit();
+	}
+}
+
+function debug(msg) {
+	if (vergose) {
+		console.log(msg);
+	}
+}
+
+function show_options() {
+	var cmd = process.argv[1].split("/")[process.argv[1].split("/").length - 1];
+	console.log("usage:", cmd, "-a addresses -i path_to_firmware -s");
+	console.log("-a: http url to update endpoint");
+	console.log("-i: path to firmware file");
+	console.log("-s: scan available devices on network");
+}
+
+if (serviceScan == true) {
+	// watch all http servers
+	var browser = mdns.createBrowser(mdns.tcp('arduino'));
+	browser.on('serviceUp', function(service) {
+		console.log(": ", service.host, service.addresses, "board:", service.txtRecord.board, "version:", service.txtRecord.version, "build:", service.txtRecord.build);
+	});
+	browser.on('serviceDown', function(service) {
+		console.log("service down: ", service.host, service.addresses, "board:", service.txtRecord.board);
+	});
+	browser.start();
+}
+
+function upload_firmware(addr, firmware) {
+	if (!fs.existsSync(firmware)) {
+		console.error(firmware, "doesn't exist");
+		process.exit();
+	}
+	return new Promise(function(resolve, reject) {
+		var stats = fs.statSync(firmware)
+		var Bytes = stats["size"]
+		console.log("Firmware size:", Bytes, "Bytes");
+		var bar = new ProgressBar("  " + addr + " Firmware upload [:bar] :rate/bps :percent :etas", {
+			complete: '=',
+			incomplete: ' ',
+			width: 20,
+			total: Bytes
+		});
+		var fileStream = fs.createReadStream(options.firmware);
+		var form = {
+			'image': fileStream,
+		};
+		var fileSize = 0;
+		fileStream.on('data', function(data) {
+			var blockLength = data.length;
+			fileSize += blockLength;
+			bar.tick(blockLength);
+		});
+		request.post({url: addr, timeout: 5000, formData: form}, function(err, httpResponse, body) {
+			if (err) {
+				console.error('upload failed:', err);
+				reject({err: err});
+			} else {
+				console.log("Upload firmare on", addr, "done with", httpResponse.statusCode);
+				resolve({addr: addr, code: httpResponse.statusCode});
+			}
+		});
+	});
+}
+
+async function upload_firmware_multi(addrs, firmware) {
+	for (var i = 0; i < addrs.length; i++) {
+		try {
+			var ret = await upload_firmware(addrs[i], options.firmware);
+			console.log(ret);
+		} catch(e) {
+			console.error(e);
+		}
+	}
+	//process.exit();
+}
+
+if (options.address) {
+	if (options.address.length > 1) {
+		var ret = upload_firmware_multi(options.address, options.firmware);
+		console.log("Firmware update done with", ret);
+	} else {
+		var ret = upload_firmware(options.address[0], options.firmware);
+		console.log("Firmware update done with", ret);
+	}
+}

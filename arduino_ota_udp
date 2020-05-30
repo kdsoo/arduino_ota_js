@@ -1,0 +1,76 @@
+#!/usr/bin/env node
+var util = require('util');
+net = require('net');
+var fs = require('fs');
+var crypto = require('crypto');
+var dgram = require('dgram');
+var invitationSocket = dgram.createSocket('udp4');
+
+var serverPort  = 48266;
+var serverHost  = "0.0.0.0";
+var chunkSize   = 1460;
+//var chunkSize   = 1024;
+
+var nodeAddress = process.argv[2];
+var port        = process.argv[3];
+var file        = process.argv[4];
+
+function fileSize(filename) {
+  var s = require("fs").statSync(filename);
+  return s["size"];
+}
+
+var fileData = fs.readFileSync(file);
+var fmd5 = crypto.createHash('md5').update(fileData).digest("hex");
+var uploadSize = fileSize(file);
+console.log("Firmware size:", uploadSize, ", MD5:", fmd5);
+
+console.log("Starting on %s:%d", serverHost, serverPort);
+var server = net.createServer(function (socket) {
+	process.stdout.write("Uploading");
+	var fd = fs.openSync(file, 'r');
+	var fbuffer = Buffer.alloc(chunkSize);
+	var lastChunk = fs.readSync(fd, fbuffer, 0, chunkSize);
+	socket.write(fbuffer);
+
+	var timer = setTimeout(function() {
+		console.log("Timeout");
+	}, 3000);
+
+	socket.on('data', function(data) {
+		clearTimeout(timer);
+		var dataString = data.toString();
+		if (dataString === "OK") {
+			console.log("\nResult: %s", dataString);
+			fs.closeSync(fd);
+			server.close();
+			process.exit();
+		}
+		process.stdout.write(".");
+
+		timer = setTimeout(function() {
+			console.log("data timeout");
+			console.log("Please restart update process again");
+			process.exit();
+		}, 5000);
+
+		if (fs.readSync(fd, fbuffer, 0, chunkSize) > 0) {
+			socket.write(fbuffer);
+		} else {
+			socket.write(fbuffer);
+			console.log("\nWaiting for result...");
+		}
+	});
+})
+
+server.listen(serverPort, serverHost, function() {
+	console.log("Update server listening");
+	console.log("Upload size: %d", uploadSize);
+	var buf = Buffer.from(util.format("%d %d %d %s\n", 0, serverPort, uploadSize, fmd5));
+	console.log("Sending invitation to: %s", nodeAddress);
+	invitationSocket.send(buf, 0, buf.length, port, nodeAddress, function () {
+		invitationSocket.close();
+		console.log("Waiting for device...\n");
+	});
+});
+

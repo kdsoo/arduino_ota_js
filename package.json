@@ -1,0 +1,10 @@
+{
+	"name": "seahaven-messaging-service",
+	"version": "0.1.0",
+	"private": true,
+	"dependencies": {
+		"request": "*",
+		"progress": "*",
+		"mdns": "*"
+	}
+}
