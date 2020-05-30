@@ -1,5 +1,5 @@
 {
-	"name": "seahaven-messaging-service",
+	"name": "SeaHaven-Arduino-OTA",
 	"version": "0.1.0",
 	"private": true,
 	"dependencies": {
