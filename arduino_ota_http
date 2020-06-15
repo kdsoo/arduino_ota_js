@@ -118,23 +118,27 @@ function upload_firmware(addr, firmware) {
 }
 
 async function upload_firmware_multi(addrs, firmware) {
+	var result = [];
 	for (var i = 0; i < addrs.length; i++) {
 		try {
 			var ret = await upload_firmware(addrs[i], options.firmware);
-			console.log(ret);
+			result.push({addr: addrs[i], ret: ret, err: null});
 		} catch(e) {
 			console.error(e);
+			result.push({addr: addrs[i], ret: null, err: e});
 		}
 	}
-	//process.exit();
+	return result;
 }
 
 if (options.address) {
 	if (options.address.length > 1) {
-		var ret = upload_firmware_multi(options.address, options.firmware);
-		console.log("Firmware update done with", ret);
+		upload_firmware_multi(options.address, options.firmware).then(function(ret) {
+			console.log("Firmware update done with", ret);
+		});
 	} else {
-		var ret = upload_firmware(options.address[0], options.firmware);
-		console.log("Firmware update done with", ret);
+		upload_firmware(options.address[0], options.firmware).then(function(ret) {
+			console.log("Firmware update done with", ret);
+		});
 	}
 }
