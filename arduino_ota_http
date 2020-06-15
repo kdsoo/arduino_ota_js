@@ -20,8 +20,8 @@ if (!Object.keys(options).length) {
 }
 
 if (options.scan) {
-	var mdns = require('mdns');
-	mdns.Browser.defaultResolverSequence[1] = 'DNSServiceGetAddrInfo' in mdns.dns_sd ? mdns.rst.DNSServiceGetAddrInfo() : mdns.rst.getaddrinfo({families:[4]});
+	var mdns = require('mdns-js');
+	mdns.excludeInterface('0.0.0.0');
 
 	// mdns scan
 	serviceScan = true;
@@ -52,16 +52,32 @@ function show_options() {
 	console.log("-s: scan available devices on network");
 }
 
+function parseTxtRecord(txt, item) {
+	var record = null;
+	for (var i = 0; i < txt.length; i++) {
+		var data = txt[i].split("=");
+		if (item == data[0]) {
+			record = data[1];
+		}
+	}
+	return record;
+}
+
 if (serviceScan == true) {
-	// watch all http servers
-	var browser = mdns.createBrowser(mdns.tcp('arduino'));
-	browser.on('serviceUp', function(service) {
-		console.log(": ", service.host, service.addresses, "board:", service.txtRecord.board, "version:", service.txtRecord.version, "build:", service.txtRecord.build);
+	var browser = mdns.createBrowser(mdns.tcp("arduino"));
+
+	browser.on('ready', function onReady() {
+		console.log('browser is ready');
+		browser.discover();
 	});
-	browser.on('serviceDown', function(service) {
-		console.log("service down: ", service.host, service.addresses, "board:", service.txtRecord.board);
+
+	browser.on('update', function onUpdate(data) {
+		console.log(data.host, data.addresses, "\tboard:", parseTxtRecord(data.txt, "board"), "\tversion:", parseTxtRecord(data.txt, "version"), "\tbuild:", parseTxtRecord(data.txt, "build"));
 	});
-	browser.start();
+
+	setTimeout(function onTimeout() {
+		browser.stop();
+	}, 5000);
 }
 
 function upload_firmware(addr, firmware) {
