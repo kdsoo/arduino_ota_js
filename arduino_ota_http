@@ -72,7 +72,7 @@ if (serviceScan == true) {
 	});
 
 	browser.on('update', function onUpdate(data) {
-		console.log(data.host, data.addresses, "\tboard:", parseTxtRecord(data.txt, "board"), "\tversion:", parseTxtRecord(data.txt, "version"), "\tbuild:", parseTxtRecord(data.txt, "build"));
+		console.log(data.host, data.addresses, "\n\tboard:", parseTxtRecord(data.txt, "board"), "\n\tversion:", parseTxtRecord(data.txt, "version"), "\n\tbuild:", parseTxtRecord(data.txt, "build"));
 	});
 
 	setTimeout(function onTimeout() {
