@@ -68,7 +68,7 @@ function show_options() {
 
 function parseTxtRecord(txt) {
 	var record = "";
-	var items = ["board", "version", "build"];
+	var items = ["board", "version", "build", "endpoint"];
 	for (var i = 0; i < txt.length; i++) {
 		var data = txt[i].split("=");
 		if (items.indexOf(data[0]) > -1) {
