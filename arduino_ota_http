@@ -6,12 +6,11 @@ var ProgressBar = require('progress');
 var commandLineArgs = require('command-line-args')
 var optionDefinitions = [
 	{name: 'verbose', alias: 'v', type: Boolean},
-	{name: 'scan', alias: 's', type: Boolean},
+	{name: 'scan', alias: 's', type: String},
 	{name: 'address', alias: 'a', type: String, multiple: true},
 	{name: 'firmware', alias: 'i', type: String}
 ];
 var options = commandLineArgs(optionDefinitions)
-var serviceScan = false;
 
 if (!Object.keys(options).length) {
 	console.error("No argument given");
@@ -19,15 +18,30 @@ if (!Object.keys(options).length) {
 	process.exit();
 }
 
-if (options.scan) {
+if (options.scan || options.scan === null) {
 	var mdns = require('mdns-js');
 	mdns.excludeInterface('0.0.0.0');
 
 	// mdns scan
-	serviceScan = true;
+	var serviceName = options.scan;
+	if (serviceName == null) serviceName = "arduino";
+	var browser = mdns.createBrowser(mdns.tcp(serviceName));
+
+	browser.on('ready', function onReady() {
+		console.log('Start discovering', serviceName, "service node");
+		browser.discover();
+	});
+
+	browser.on('update', function onUpdate(data) {
+		console.log("*", data.host, data.addresses, parseTxtRecord(data.txt));
+	});
+
+	setTimeout(function onTimeout() {
+		browser.stop();
+	}, 5000);
 } else {
 	if (!options.address) {
-		console.error("Adress is not given");
+		console.error("Address is not given");
 		show_options();
 		process.exit();
 	}
@@ -49,35 +63,19 @@ function show_options() {
 	console.log("usage:", cmd, "-a addresses -i path_to_firmware -s");
 	console.log("-a: http url to update endpoint");
 	console.log("-i: path to firmware file");
-	console.log("-s: scan available devices on network");
+	console.log("-s: scan available services on network");
 }
 
-function parseTxtRecord(txt, item) {
-	var record = null;
+function parseTxtRecord(txt) {
+	var record = "";
+	var items = ["board", "version", "build"];
 	for (var i = 0; i < txt.length; i++) {
 		var data = txt[i].split("=");
-		if (item == data[0]) {
-			record = data[1];
+		if (items.indexOf(data[0]) > -1) {
+			record += "\n\t" + data[0] + ": " + data[1];
 		}
 	}
 	return record;
-}
-
-if (serviceScan == true) {
-	var browser = mdns.createBrowser(mdns.tcp("arduino"));
-
-	browser.on('ready', function onReady() {
-		console.log('browser is ready');
-		browser.discover();
-	});
-
-	browser.on('update', function onUpdate(data) {
-		console.log(data.host, data.addresses, "\n\tboard:", parseTxtRecord(data.txt, "board"), "\n\tversion:", parseTxtRecord(data.txt, "version"), "\n\tbuild:", parseTxtRecord(data.txt, "build"));
-	});
-
-	setTimeout(function onTimeout() {
-		browser.stop();
-	}, 5000);
 }
 
 function upload_firmware(addr, firmware) {
