@@ -24,6 +24,7 @@ if (options.scan || options.scan === null) {
 
 	// mdns scan
 	var serviceName = options.scan;
+	var nodeCounter = 0;
 	if (serviceName == null) serviceName = "arduino";
 	var browser = mdns.createBrowser(mdns.tcp(serviceName));
 
@@ -34,10 +35,12 @@ if (options.scan || options.scan === null) {
 
 	browser.on('update', function onUpdate(data) {
 		console.log("*", data.host, data.addresses, parseTxtRecord(data.txt));
+		++nodeCounter;
 	});
 
 	setTimeout(function onTimeout() {
 		browser.stop();
+		console.log("Total", nodeCounter, serviceName, "nodes found on the network");
 	}, 5000);
 } else {
 	if (!options.address) {
